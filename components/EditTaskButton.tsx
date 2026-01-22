@@ -1,22 +1,22 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
+import { Task } from '@/lib/types';
 import { useState } from 'react';
 
-interface AddTaskButtonProps {
-  courseId: string;
-  onTaskAdded: () => void;
+interface EditTaskButtonProps {
+  task: Task;
+  onTaskUpdated: () => void;
 }
 
-export default function AddTaskButton({ courseId, onTaskAdded }: AddTaskButtonProps) {
+export default function EditTaskButton({ task, onTaskUpdated }: EditTaskButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [taskType, setTaskType] = useState<'assignment' | 'assessment'>('assignment');
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [dueTime, setDueTime] = useState('');
+  const [name, setName] = useState(task.name);
+  const [description, setDescription] = useState(task.description || '');
+  const [startDate, setStartDate] = useState(task.start_date || '');
+  const [startTime, setStartTime] = useState(task.start_time || '');
+  const [dueDate, setDueDate] = useState(task.due_date || '');
+  const [dueTime, setDueTime] = useState(task.due_time || '');
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
 
@@ -24,27 +24,21 @@ export default function AddTaskButton({ courseId, onTaskAdded }: AddTaskButtonPr
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.from('tasks').insert({
-      course_id: courseId,
-      task_type: taskType,
-      name,
-      description: description || null,
-      start_date: startDate || null,
-      start_time: startTime || null,
-      due_date: dueDate || null,
-      due_time: dueTime || null,
-      is_completed: false,
-    });
+    const { error } = await supabase
+      .from('tasks')
+      .update({
+        name,
+        description: description || null,
+        start_date: startDate || null,
+        start_time: startTime || null,
+        due_date: dueDate || null,
+        due_time: dueTime || null,
+      })
+      .eq('id', task.id);
 
     if (!error) {
-      setName('');
-      setDescription('');
-      setStartDate('');
-      setStartTime('');
-      setDueDate('');
-      setDueTime('');
       setIsOpen(false);
-      onTaskAdded();
+      onTaskUpdated();
     }
 
     setLoading(false);
@@ -54,44 +48,17 @@ export default function AddTaskButton({ courseId, onTaskAdded }: AddTaskButtonPr
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+        className="text-gray-600 hover:text-gray-700 text-sm font-medium"
+        title="Edit task"
       >
-        + Add Task
+        ✎
       </button>
 
       {isOpen && (
         <div className="fixed inset-0 flex items-center justify-center p-4 z-50 pointer-events-none">
           <div className="bg-white rounded-lg shadow-md p-6 max-w-md w-full max-h-[90vh] overflow-y-auto border border-gray-200 pointer-events-auto">
-            <h2 className="text-xl font-bold mb-4">Add New Task</h2>
+            <h2 className="text-xl font-bold mb-4">Edit Task</h2>
             <form onSubmit={handleSubmit}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Task Type
-                </label>
-                <div className="flex gap-4">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      value="assignment"
-                      checked={taskType === 'assignment'}
-                      onChange={(e) => setTaskType(e.target.value as 'assignment')}
-                      className="mr-2"
-                    />
-                    Assignment
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      value="assessment"
-                      checked={taskType === 'assessment'}
-                      onChange={(e) => setTaskType(e.target.value as 'assessment')}
-                      className="mr-2"
-                    />
-                    Assessment
-                  </label>
-                </div>
-              </div>
-
               <div className="mb-4">
                 <label
                   htmlFor="name"
@@ -127,7 +94,7 @@ export default function AddTaskButton({ courseId, onTaskAdded }: AddTaskButtonPr
                 />
               </div>
 
-              {taskType === 'assignment' && (
+              {task.task_type === 'assignment' && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Start Date & Time (Optional)
@@ -151,7 +118,7 @@ export default function AddTaskButton({ courseId, onTaskAdded }: AddTaskButtonPr
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {taskType === 'assignment' ? 'Due Date & Time' : 'Date & Time'}
+                  {task.task_type === 'assignment' ? 'Due Date & Time' : 'Date & Time'}
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -163,7 +130,7 @@ export default function AddTaskButton({ courseId, onTaskAdded }: AddTaskButtonPr
                   />
                   <input
                     type="time"
-                    required={taskType === 'assessment'}
+                    required={task.task_type === 'assessment'}
                     value={dueTime}
                     onChange={(e) => setDueTime(e.target.value)}
                     className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
@@ -184,7 +151,7 @@ export default function AddTaskButton({ courseId, onTaskAdded }: AddTaskButtonPr
                   disabled={loading}
                   className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {loading ? 'Adding...' : 'Add Task'}
+                  {loading ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>

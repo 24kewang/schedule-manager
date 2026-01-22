@@ -11,6 +11,8 @@ export default function Home() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [draggedCourseId, setDraggedCourseId] = useState<string | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const supabase = createClient();
 
   const fetchData = async () => {
@@ -39,6 +41,37 @@ export default function Home() {
     return tasks.filter((task) => task.course_id === courseId);
   };
 
+  const handleDragStart = (courseId: string) => {
+    setDraggedCourseId(courseId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedCourseId(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    
+    if (!draggedCourseId) return;
+    
+    const draggedIndex = courses.findIndex((c) => c.id === draggedCourseId);
+    
+    // Only reorder if hovering over a different index
+    if (draggedIndex === index || dragOverIndex === index) return;
+    
+    // Create new order based on hover position
+    const newCourses = [...courses];
+    const [draggedCourse] = newCourses.splice(draggedIndex, 1);
+    newCourses.splice(index, 0, draggedCourse);
+    
+    setCourses(newCourses);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b border-gray-200">
@@ -61,13 +94,22 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {courses.map((course) => (
-              <CourseCard
+            {courses.map((course, index) => (
+              <div
                 key={course.id}
-                course={course}
-                tasks={getTasksForCourse(course.id)}
-                onUpdate={fetchData}
-              />
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragLeave={handleDragLeave}
+                className="transition-all duration-200"
+              >
+                <CourseCard
+                  course={course}
+                  tasks={getTasksForCourse(course.id)}
+                  onUpdate={fetchData}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  isDragging={draggedCourseId === course.id}
+                />
+              </div>
             ))}
           </div>
         )}

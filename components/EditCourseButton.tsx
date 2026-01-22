@@ -1,16 +1,18 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
+import { Course } from '@/lib/types';
 import { useState } from 'react';
 
-interface AddCourseButtonProps {
-  onCourseAdded: () => void;
+interface EditCourseButtonProps {
+  course: Course;
+  onCourseUpdated: () => void;
 }
 
-export default function AddCourseButton({ onCourseAdded }: AddCourseButtonProps) {
+export default function EditCourseButton({ course, onCourseUpdated }: EditCourseButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [title, setTitle] = useState(course.title);
+  const [description, setDescription] = useState(course.description || '');
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
 
@@ -18,23 +20,17 @@ export default function AddCourseButton({ onCourseAdded }: AddCourseButtonProps)
     e.preventDefault();
     setLoading(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    const { error } = await supabase.from('courses').insert({
-      user_id: user.id,
-      title,
-      description: description || null,
-    });
+    const { error } = await supabase
+      .from('courses')
+      .update({
+        title,
+        description: description || null,
+      })
+      .eq('id', course.id);
 
     if (!error) {
-      setTitle('');
-      setDescription('');
       setIsOpen(false);
-      onCourseAdded();
+      onCourseUpdated();
     }
 
     setLoading(false);
@@ -44,15 +40,16 @@ export default function AddCourseButton({ onCourseAdded }: AddCourseButtonProps)
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        className="text-gray-600 hover:text-gray-700 text-sm font-medium"
+        title="Edit course"
       >
-        + Add Course
+        ✎
       </button>
 
       {isOpen && (
         <div className="fixed inset-0 flex items-center justify-center p-4 z-50 pointer-events-none">
           <div className="bg-white rounded-lg shadow-md p-6 max-w-md w-full border border-gray-200 pointer-events-auto">
-            <h2 className="text-xl font-bold mb-4">Add New Course</h2>
+            <h2 className="text-xl font-bold mb-4">Edit Course</h2>
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
                 <label
@@ -102,7 +99,7 @@ export default function AddCourseButton({ onCourseAdded }: AddCourseButtonProps)
                   disabled={loading}
                   className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {loading ? 'Adding...' : 'Add Course'}
+                  {loading ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>
