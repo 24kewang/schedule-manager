@@ -1,15 +1,26 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 export default function SignIn() {
+  const errorParam = useSearchParams().get('error');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  useEffect(() => {
+    if (errorParam === 'cookie_timeout') {
+      setError('Your session timed out. Please sign in again.')
+    }
+    else if (errorParam === 'oauth_failed') {
+      setError('There was an error with OAuth sign-in. Please try again.')
+    }
+  }, [errorParam]);
+
   const router = useRouter();
   const supabase = createClient();
 

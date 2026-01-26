@@ -94,10 +94,10 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
     if (diffHours >= 0) {
       // Future deadline
       if (diffHours < 24) {
-        const hours = Math.ceil(diffHours);
+        const hours = Math.floor(diffHours);
         return `Due in ${hours} hour${hours !== 1 ? 's' : ''}`;
       }
-      const days = Math.ceil(diffDays);
+      const days = Math.floor(diffDays);
       return `Due in ${days} day${days !== 1 ? 's' : ''}`;
     } else {
       // Past deadline (overdue) - only show for assignments, not assessments
