@@ -24,10 +24,22 @@ export default function AddCourseButton({ onCourseAdded }: AddCourseButtonProps)
 
     if (!user) return;
 
+    // Get the highest current display_order
+    // const { data: existingCourses } = await supabase
+    //   .from('courses')
+    //   .select('display_order')
+    //   .eq('user_id', user.id)
+    //   .order('display_order', { ascending: false })
+    //   .limit(1);
+    
+    // const maxOrder = existingCourses?.[0]?.display_order || 0;
+    const newOrder = 0;
+
     const { error } = await supabase.from('courses').insert({
       user_id: user.id,
       title,
       description: description || null,
+      display_order: newOrder,
     });
 
     if (!error) {

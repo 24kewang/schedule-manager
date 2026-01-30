@@ -28,6 +28,7 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
   const [assessmentFilters, setAssessmentFilters] = useState<Set<AssessmentStatus>>(
     new Set(['red', 'blue', 'green'])
   );
+  const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
 
   const assignments = tasks.filter((t) => t.task_type === 'assignment');
@@ -88,29 +89,49 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
     if (!dueDate) return null;
 
     const diffMs = dueDate.getTime() - now.getTime();
+    const diffMinutes = diffMs / (1000 * 60);
     const diffHours = diffMs / (1000 * 60 * 60);
     const diffDays = diffMs / (1000 * 60 * 60 * 24);
 
-    if (diffHours >= 0) {
+    if (diffMinutes >= 0) {
       // Future deadline
-      if (diffHours < 24) {
+      if (diffMinutes < 60) {
+        const minutes = Math.floor(diffMinutes);
+        if (minutes === 0) return 'Due now';
+        return `Due in ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+      } else if (diffHours < 24) {
         const hours = Math.floor(diffHours);
-        return `Due in ${hours} hour${hours !== 1 ? 's' : ''}`;
+        const remainingMinutes = Math.floor(diffMinutes - (hours * 60));
+        if (remainingMinutes === 0) {
+          return `Due in ${hours} hour${hours !== 1 ? 's' : ''}`;
+        }
+        return `Due in ${hours}h ${remainingMinutes}m`;
+      } else {
+        const days = Math.floor(diffDays);
+        return `Due in ${days} day${days !== 1 ? 's' : ''}`;
       }
-      const days = Math.floor(diffDays);
-      return `Due in ${days} day${days !== 1 ? 's' : ''}`;
     } else {
       // Past deadline (overdue) - only show for assignments, not assessments
       if (task.task_type === 'assessment') return null;
       
+      const absDiffMinutes = Math.abs(diffMinutes);
       const absDiffHours = Math.abs(diffHours);
       const absDiffDays = Math.abs(diffDays);
-      if (absDiffHours < 24) {
+      
+      if (absDiffMinutes < 60) {
+        const minutes = Math.floor(absDiffMinutes);
+        return `Due ${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+      } else if (absDiffHours < 24) {
         const hours = Math.floor(absDiffHours);
-        return `Due ${hours} hour${hours !== 1 ? 's' : ''} ago`;
+        const remainingMinutes = Math.floor(absDiffMinutes - (hours * 60));
+        if (remainingMinutes === 0) {
+          return `Due ${hours} hour${hours !== 1 ? 's' : ''} ago`;
+        }
+        return `Due ${hours}h ${remainingMinutes}m ago`;
+      } else {
+        const days = Math.floor(absDiffDays);
+        return `Due ${days} day${days !== 1 ? 's' : ''} ago`;
       }
-      const days = Math.floor(absDiffDays);
-      return `Due ${days} day${days !== 1 ? 's' : ''} ago`;
     }
   };
 
@@ -151,18 +172,30 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
 
   const sortAssignmentsByStatus = (tasks: Task[]): Task[] => {
     const statusOrder: Record<AssignmentStatus, number> = { red: 0, yellow: 1, blue: 2, green: 3 };
-    return sortTasksByDueDate(tasks).sort(
-      (a, b) =>
-        statusOrder[getAssignmentStatus(a)] - statusOrder[getAssignmentStatus(b)]
-    );
+    return sortTasksByDueDate(tasks).sort((a, b) => {
+      // First sort by completion status (incomplete first)
+      if (a.is_completed && !b.is_completed) return 1;
+      if (!a.is_completed && b.is_completed) return -1;
+      
+      // Then by starred status
+      if (a.is_starred && !b.is_starred) return -1;
+      if (!a.is_starred && b.is_starred) return 1;
+      
+      // Finally by status (due date priority)
+      return statusOrder[getAssignmentStatus(a)] - statusOrder[getAssignmentStatus(b)];
+    });
   };
 
   const sortAssessmentsByStatus = (tasks: Task[]): Task[] => {
     const statusOrder: Record<AssessmentStatus, number> = { red: 0, blue: 1, green: 2 };
-    return sortTasksByDueDate(tasks).sort(
-      (a, b) =>
-        statusOrder[getAssessmentStatus(a)] - statusOrder[getAssessmentStatus(b)]
-    );
+    return sortTasksByDueDate(tasks).sort((a, b) => {
+      // Starred tasks come first
+      if (a.is_starred && !b.is_starred) return -1;
+      if (!a.is_starred && b.is_starred) return 1;
+      
+      // Within starred/unstarred groups, sort by status
+      return statusOrder[getAssessmentStatus(a)] - statusOrder[getAssessmentStatus(b)];
+    });
   };
 
   const handleToggleComplete = async (taskId: string, currentStatus: boolean) => {
@@ -194,6 +227,17 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
       due_time: task.due_time,
       is_completed: false,
     });
+
+    if (!error) {
+      onUpdate();
+    }
+  };
+
+  const handleToggleStar = async (taskId: string, currentStarred: boolean) => {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ is_starred: !currentStarred })
+      .eq('id', taskId);
 
     if (!error) {
       onUpdate();
@@ -232,8 +276,14 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
     const dateTime = parseLocalDateTime(date, time);
     if (!dateTime) return '';
     
+    // Get day of week
+    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayOfWeek = daysOfWeek[dateTime.getDay()];
+    
     const dateStr = dateTime.toLocaleDateString();
-    if (!time) return dateStr;
+    const dateWithDay = `${dayOfWeek} ${dateStr}`;
+    
+    if (!time) return dateWithDay;
     
     // Format time as AM/PM
     let hours = dateTime.getHours();
@@ -242,15 +292,17 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
     hours = hours % 12 || 12;
     const timeStr = `${hours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
     
-    return `${dateStr} ${timeStr}`;
+    return `${dateWithDay} ${timeStr}`;
   };
 
   const filteredAssignments = sortAssignmentsByStatus(assignments).filter((task) =>
-    assignmentFilters.has(getAssignmentStatus(task))
+    assignmentFilters.has(getAssignmentStatus(task)) &&
+    (!showStarredOnly || task.is_starred)
   );
 
   const filteredAssessments = sortAssessmentsByStatus(assessments).filter((task) =>
-    assessmentFilters.has(getAssessmentStatus(task))
+    assessmentFilters.has(getAssessmentStatus(task)) &&
+    (!showStarredOnly || task.is_starred)
   );
 
   return (
@@ -335,6 +387,16 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
             >
               Completed
             </button>
+            <button
+              onClick={() => setShowStarredOnly(!showStarredOnly)}
+              className={`text-xs px-2 py-1 rounded ${
+                showStarredOnly
+                  ? 'bg-orange-200 text-orange-800'
+                  : 'bg-gray-200 text-gray-600'
+              }`}
+            >
+              ⭐ Starred
+            </button>
           </div>
 
           <div className="space-y-2">
@@ -349,7 +411,7 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
                 const labelColor = getDueLabelColor(task);
 
                 return (
-                  <div key={task.id} className={getBackgroundClass(status)}>
+                  <div key={task.id} className={`${getBackgroundClass(status)} ${task.is_starred ? 'border-2 border-orange-300' : ''} relative`}>
                     <div className="flex items-start gap-2">
                       <input
                         type="checkbox"
@@ -401,6 +463,13 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
                         </button>
                       </div>
                     </div>
+                    <button
+                      onClick={() => handleToggleStar(task.id, task.is_starred)}
+                      className="absolute bottom-2 left-2 text-lg hover:scale-110 transition-transform"
+                      title={task.is_starred ? 'Unstar task' : 'Star task'}
+                    >
+                      {task.is_starred ? '★' : '☆'}
+                    </button>
                   </div>
                 );
               })
@@ -446,6 +515,16 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
             >
               Completed
             </button>
+            <button
+              onClick={() => setShowStarredOnly(!showStarredOnly)}
+              className={`text-xs px-2 py-1 rounded ${
+                showStarredOnly
+                  ? 'bg-orange-200 text-orange-800'
+                  : 'bg-gray-200 text-gray-600'
+              }`}
+            >
+              ⭐ Starred
+            </button>
           </div>
 
           <div className="space-y-2">
@@ -460,7 +539,7 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
                 const labelColor = getDueLabelColor(task);
 
                 return (
-                  <div key={task.id} className={getBackgroundClass(status)}>
+                  <div key={task.id} className={`${getBackgroundClass(status)} ${task.is_starred ? 'border-2 border-orange-300' : ''} relative`}>
                     <div className="flex items-start gap-2">
                       <div className="flex-1">
                         <div className="font-medium text-gray-900">{task.name}</div>
@@ -471,7 +550,7 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
                           {formatDate(task.due_date, task.due_time)}
                         </div>
                         {dueLabel && (
-                          <div className={`text-xs mt-1 inline-block px-2 py-0.5 rounded ${labelColor}`}>
+                          <div className={`text-xs mt-1 inline-block px-2 py-0.5 rounded ${labelColor} ml-6`}>
                             {dueLabel}
                           </div>
                         )}
@@ -495,6 +574,13 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
                         </button>
                       </div>
                     </div>
+                    <button
+                      onClick={() => handleToggleStar(task.id, task.is_starred)}
+                      className="absolute bottom-2 left-2 text-lg hover:scale-110 transition-transform"
+                      title={task.is_starred ? 'Unstar task' : 'Star task'}
+                    >
+                      {task.is_starred ? '★' : '☆'}
+                    </button>
                   </div>
                 );
               })

@@ -4,12 +4,10 @@ import { createClient } from '@/lib/supabase/client';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
-export default function SignIn() {
+function ErrorMessage() {
   const errorParam = useSearchParams().get('error');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
@@ -20,6 +18,21 @@ export default function SignIn() {
       setError('There was an error with OAuth sign-in. Please try again.')
     }
   }, [errorParam]);
+
+  if (!error) return null;
+  
+  return (
+    <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
+      {error}
+    </div>
+  );
+}
+
+export default function SignIn() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
   const supabase = createClient();
@@ -69,11 +82,9 @@ export default function SignIn() {
           </h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleEmailSignIn}>
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
+          <Suspense>
+            <ErrorMessage />
+          </Suspense>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email" className="sr-only">

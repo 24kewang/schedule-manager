@@ -3,6 +3,7 @@ export interface Course {
   user_id: string;
   title: string;
   description: string | null;
+  display_order: number | null;  // NEW: User-defined sort order
   created_at: string;
   updated_at: string;
 }
@@ -18,6 +19,7 @@ export interface Task {
   due_date: string | null;
   due_time: string | null;
   is_completed: boolean;
+  is_starred: boolean;  // NEW: Priority/starred status
   created_at: string;
   updated_at: string;
 }
