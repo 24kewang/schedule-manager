@@ -11,15 +11,12 @@ interface CourseCardProps {
   course: Course;
   tasks: Task[];
   onUpdate: () => void;
-  onDragStart?: (courseId: string) => void;
-  onDragEnd?: () => void;
-  isDragging?: boolean;
 }
 
 type AssignmentStatus = 'red' | 'yellow' | 'blue' | 'green';
 type AssessmentStatus = 'red' | 'blue' | 'green';
 
-export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDragEnd, isDragging }: CourseCardProps) {
+export default function CourseCard({ course, tasks, onUpdate }: CourseCardProps) {
   const supabase = createClient();
   const [isDeleting, setIsDeleting] = useState(false);
   const [assignmentFilters, setAssignmentFilters] = useState<Set<AssignmentStatus>>(
@@ -307,16 +304,8 @@ export default function CourseCard({ course, tasks, onUpdate, onDragStart, onDra
 
   return (
     <div 
-      className={`bg-white rounded-lg shadow-md p-4 border border-gray-200 cursor-move transition-all duration-200 ${
-        isDragging ? 'opacity-40 scale-95 shadow-lg' : 'hover:shadow-lg'
-      }`}
-      draggable
-      onDragStart={() => onDragStart?.(course.id)}
-      onDragEnd={() => onDragEnd?.()}
+      className="bg-white rounded-lg shadow-md p-4 border border-gray-200 hover:shadow-lg transition-all duration-200"
     >
-      <div className="flex flex-col items-center gap-2 mb-3">
-        <div className="text-gray-400 text-sm cursor-grab active:cursor-grabbing">⋮⋮⋮</div>
-      </div>
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-900">{course.title}</h3>
